@@ -2,55 +2,87 @@ import bodyParser from "body-parser";
 import express from "express";
 import http from "http";
 import path from "path";
+import * as cluster from "cluster";
+import * as os from "os";
 
 import AppManager from "./app_manager";
 
-// ============================
-// Web Server
-// ============================
+const cpuNum: number = os.cpus().length;
 
-const expressApp = express();
+const appManager = new AppManager();
 
-const port = process.env.PORT || "8080";
-expressApp.set("port", port);
-expressApp.set("views", path.join(__dirname, "../", "views"));
-expressApp.set("view engine", "ejs");
-expressApp.use(bodyParser.json());
-expressApp.use(bodyParser.urlencoded({ extended: false }));
+if (cluster.isMaster) {
+  // ============================
+  // Web Server
+  // ============================
 
-// routing
+  const expressApp = express();
 
-expressApp.get("/", async (req: any, res: any) => {
-  res.json({});
-});
+  const port = process.env.PORT || "8080";
+  expressApp.set("port", port);
+  expressApp.set("views", path.join(__dirname, "../", "views"));
+  expressApp.set("view engine", "ejs");
+  expressApp.use(bodyParser.json());
+  expressApp.use(bodyParser.urlencoded({ extended: false }));
 
-expressApp.post("/webhook", async (req: any, res: any) => {
-  console.log(req.body);
-  await appManager.webhooked(req.body);
+  // routing
 
-  res.json({});
-});
+  expressApp.get("/", async (req: any, res: any) => {
+    res.json({});
+  });
 
-// Listen
+  expressApp.post("/webhook", async (req: any, res: any) => {
+    console.log(req.body);
+    await appManager.webhooked(req.body);
 
-const server = http.createServer(expressApp);
-server.listen(port);
-server.on("error", (e: any) => {
-  console.error(e);
-  process.exit(1);
-});
-server.on("listening", () => {
-  console.log("listening");
-});
+    res.json({});
+  });
 
+  // Listen
+
+  const server = http.createServer(expressApp);
+  server.listen(port);
+  server.on("error", (e: any) => {
+    console.error(e);
+    process.exit(1);
+  });
+  server.on("listening", () => {
+    console.log("listening");
+  });
+
+  // Start child processes
+  for (let i = 0; i < cpuNum; i++) {
+    cluster.fork();
+  }
+  // Allocate installs
+  appManager.allocate();
+
+} else {
+  
+  process.on("message", (msg: any) => {
+    switch(msg.type) {
+      
+      case "start": 
+        // appManager.startApp(msg.content);
+        console.log(`worker ${cluster.worker.id} start app ${msg.content.id}`);
+        break;
+      
+      case "stop":
+        // appManager.stopApp(msg.content);
+        console.log(`worker ${cluster.worker.id} stop app ${msg.content.id}`);
+        break;
+    }
+  });
+
+}
 // ============================
 // Apps
 // ============================
 
-const appManager = new AppManager();
-appManager
-  .start()
-  .then(() => {})
-  .catch((e: Error) => {
-    throw e;
-  });
+// const appManager = new AppManager();
+// appManager
+//   .start()
+//   .then(() => {})
+//   .catch((e: Error) => {
+//     throw e;
+//   });

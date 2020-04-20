@@ -1,16 +1,43 @@
+import * as cluster from "cluster";
+
+import IORedis from 'ioredis';
+
 import App from "./app";
 import InstallRequest from "./install";
+
 
 const api_obniz_io = `https://api.obniz.io`;
 const WebAppToken: string = process.env.TOKEN!;
 
+const dummyInstalls = [
+  {
+      id: "ins1",
+      configs: {},
+      createdAt: "",
+      updatedAt: "",
+      user: {},
+      devicesInConfig: {}
+  },
+  {
+    id: "ins2",
+    configs: {},
+    createdAt: "",
+    updatedAt: "",
+    user: {},
+    devicesInConfig: {}
+},
+]
 export default class AppManager {
   private installs: any = [];
   private apps: App[] = [];
+  private redis: IORedis.Redis;
+  public workerStatus: { [key: number]: any } = {};
 
-  constructor() {}
+  constructor(options?: IORedis.RedisOptions) {
+    this.redis = new IORedis(options);
+  }
 
-  public async start() {
+  public async allocate() {
     // Getting All Installs
     while (true) {
       const result = await InstallRequest(api_obniz_io, WebAppToken, this.installs.length);
@@ -24,21 +51,68 @@ export default class AppManager {
       }
     }
     console.log(`Install app number=${this.installs.length}`);
-    // start all apps
-    for (const install of this.installs) {
-      await this.startApp(install);
+    
+    this.installs = dummyInstalls;
+
+    const worker_num = Object.keys(cluster.workers).length;
+    for (let workerId = 1; workerId <= worker_num; workerId++) {
+      this.workerStatus[workerId] = 0;
     }
+    for (const install of this.installs) {
+      this.allocateInstall(install);
+    }
+
+  }
+
+  private async allocateInstall(install: any) {
+    // Allocate install to worker with minimal installs
+    let workerId = Object.keys(this.workerStatus).filter((x: any) => {
+      return this.workerStatus[x] == Math.min(...Object.values(this.workerStatus))
+    })[0];
+
+    cluster.workers[workerId]?.send({
+      type: "start",
+      content: install
+    });
+
+    this.workerStatus[Number(workerId)] += 1;
+
+    // TODO: 現状の実装だとRedisへの格納は不要
+    await this.redis.set(
+      install.id,
+      JSON.stringify({
+        content: install,
+        worker_id: workerId
+      })
+    );
   }
 
   public async webhooked(obj: any) {
     const install = obj.data;
     if (obj.type === "install.create") {
-      this.startApp(install);
+      // this.installsへ追加
+      this.installs.push(install);
+      // 割り当て
+      await this.allocateInstall(install);
     } else if (obj.type === "install.update") {
-      this.stopApp(install);
-      this.startApp(install);
+      const data = await this.redis.get(install.id);
+      const workerId = JSON.parse(data!).worker_id;
+      cluster.workers[workerId]?.send({
+        type: "stop",
+        content: install
+      });
+      // TODO: stopするのを待つ必要がある気がする
+      cluster.workers[workerId]?.send({
+        type: "start",
+        content: install
+      });
     } else if (obj.type === "install.delete") {
-      this.stopApp(install);
+      const data = await this.redis.get(install.id);
+      const workerId = JSON.parse(data!).worker_id;
+      cluster.workers[workerId]?.send({
+        type: "stop",
+        content: install
+      });
     }
   }
 
