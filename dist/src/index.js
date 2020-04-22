@@ -54,7 +54,7 @@ if (cluster.isMaster) {
         cluster.fork();
     }
     // Allocate installs
-    appManager.allocate();
+    appManager.start();
 }
 else {
     process.on("message", (msg) => {

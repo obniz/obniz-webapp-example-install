@@ -28,98 +28,140 @@ const dummyInstalls = [
 },
 ]
 export default class AppManager {
-  private installs: any = [];
   private apps: App[] = [];
   private redis: IORedis.Redis;
-  public workerStatus: { [key: number]: any } = {};
 
   constructor(options?: IORedis.RedisOptions) {
     this.redis = new IORedis(options);
   }
 
-  public async allocate() {
+  public async start() {
+    let installs: any[] = [];
     // Getting All Installs
     while (true) {
-      const result = await InstallRequest(api_obniz_io, WebAppToken, this.installs.length);
+      const result = await InstallRequest(api_obniz_io, WebAppToken, installs.length);
       console.log(result);
       for (const edge of result.webapp.installs.edges) {
         const node = edge.node;
-        this.installs.push(node);
+        installs.push(node);
       }
       if (!result.webapp.installs.pageInfo.hasNextPage) {
         break;
       }
     }
-    console.log(`Install app number=${this.installs.length}`);
+    installs = dummyInstalls;
+    console.log(`Install app number=${installs.length}`);
     
-    this.installs = dummyInstalls;
 
-    const worker_num = Object.keys(cluster.workers).length;
-    for (let workerId = 1; workerId <= worker_num; workerId++) {
-      this.workerStatus[workerId] = 0;
+    // Initialize all workers status
+    const workerNum = Object.keys(cluster.workers).length;
+    for (let workerId = 1; workerId <= workerNum; workerId++) {
+      if (await this.redis.exists("worker:" + workerId)) {
+        let havingInstalls = await this.redis.lrange(
+          "worker:" + workerId, 0, await this.redis.llen("worker:" + workerId)
+        );
+        havingInstalls = JSON.parse("[" + String(havingInstalls) + "]");
+        const havingInstallsId = havingInstalls.map((install: any) => install.id);
+        // Start already allocated installs
+        for (const installId of havingInstallsId) {
+          const allInstallsId = installs.map((install: any) => install.id);
+          if (allInstallsId.indexOf(installId) >= 0) {
+            cluster.workers[workerId]?.send({
+              type: "start",
+              content: havingInstalls.filter((install: any) => install.id == installId)[0]
+            });
+          } else {
+            await this.redis.lrem(
+              "worker:" + workerId,
+              1,
+              JSON.stringify(havingInstalls.filter((install: any) => install.id == installId)[0])
+            );
+          }
+        }
+        // Delete started installs from all installs
+        installs = installs.filter((install: any) => havingInstallsId.indexOf(install.id) < 0);
+      }
     }
-    for (const install of this.installs) {
-      this.allocateInstall(install);
+    for (const install of installs) {
+      await this.allocateInstall(install);
+    }
+  }
+
+  private async getLazyWorkerId(): Promise<number> {
+    let lazyWorkerId = 0;
+    let minInstallNum = 1000;
+    const workerNum = Object.keys(cluster.workers).length;
+
+    for (let workerId = 1; workerId <= workerNum; workerId++) {
+      let havingInstallNum = await this.redis.llen("worker:" + workerId);
+      console.log(`worker:${workerId} has ${havingInstallNum} installs`);
+      if (havingInstallNum < minInstallNum) {
+        minInstallNum = havingInstallNum;
+        lazyWorkerId = workerId;
+      }
     }
 
+    return lazyWorkerId;
   }
 
   private async allocateInstall(install: any) {
     // Allocate install to worker with minimal installs
-    let workerId = Object.keys(this.workerStatus).filter((x: any) => {
-      return this.workerStatus[x] == Math.min(...Object.values(this.workerStatus))
-    })[0];
+    let workerId = await this.getLazyWorkerId();
 
     cluster.workers[workerId]?.send({
       type: "start",
       content: install
     });
+  }
 
-    this.workerStatus[Number(workerId)] += 1;
+  private async deleteInstall(install: any) {
+    let workerId = await this.getWorker(install.id);
 
-    // TODO: 現状の実装だとRedisへの格納は不要
-    await this.redis.set(
-      install.id,
-      JSON.stringify({
-        content: install,
-        worker_id: workerId
-      })
-    );
+    cluster.workers[workerId!]?.send({
+      type: "stop",
+      content: install
+    });
   }
 
   public async webhooked(obj: any) {
     const install = obj.data;
     if (obj.type === "install.create") {
-      // this.installsへ追加
-      this.installs.push(install);
-      // 割り当て
       await this.allocateInstall(install);
     } else if (obj.type === "install.update") {
-      const data = await this.redis.get(install.id);
-      const workerId = JSON.parse(data!).worker_id;
-      cluster.workers[workerId]?.send({
-        type: "stop",
-        content: install
-      });
+      await this.deleteInstall(install);
       // TODO: stopするのを待つ必要がある気がする
-      cluster.workers[workerId]?.send({
-        type: "start",
-        content: install
-      });
+      // TODO: 同じworkerの方がいい？
+      await this.allocateInstall(install);
     } else if (obj.type === "install.delete") {
-      const data = await this.redis.get(install.id);
-      const workerId = JSON.parse(data!).worker_id;
-      cluster.workers[workerId]?.send({
-        type: "stop",
-        content: install
-      });
+      await this.deleteInstall(install);
     }
+  }
+
+  private async getWorker(installId: number | string): Promise<number | null> {
+    const workerNum = Object.keys(cluster.workers).length;
+    for (let workerId = 1; workerId <= workerNum; workerId++) {
+      if (await this.redis.exists("worker:" + workerId)) {
+        const havingInstalls = await this.redis.lrange(
+          "worker:" + workerId, 0, await this.redis.llen("worker:" + workerId)
+        );
+        const havingInstallsId = havingInstalls.map((install: any) => install.id);
+        if (havingInstallsId.indexOf(installId) >= 0) {
+          return workerId;
+        }
+      }
+    }
+
+    return null;
   }
 
   public async startApp(install: any) {
     const app = new App(install);
     this.apps.push(app);
     await app.start();
+    await this.redis.rpush(
+      "worker:" + cluster.worker.id,
+      JSON.stringify(install)
+    );
     looping(app).then(() => {
       // finished looping
     });
@@ -130,6 +172,11 @@ export default class AppManager {
       if (app.id === install.id) {
         this.apps.splice(this.apps.indexOf(app), 1);
         await app.stop();
+        await this.redis.lrem(
+          "worker:" + cluster.worker.id,
+          1,
+          JSON.stringify(install)
+        );
         return;
       }
     }

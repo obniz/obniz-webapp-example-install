@@ -55,7 +55,7 @@ if (cluster.isMaster) {
     cluster.fork();
   }
   // Allocate installs
-  appManager.allocate();
+  appManager.start();
 
 } else {
   
@@ -63,12 +63,12 @@ if (cluster.isMaster) {
     switch(msg.type) {
       
       case "start": 
-        // appManager.startApp(msg.content);
+        // await appManager.startApp(msg.content);
         console.log(`worker ${cluster.worker.id} start app ${msg.content.id}`);
         break;
       
       case "stop":
-        // appManager.stopApp(msg.content);
+        // await appManager.stopApp(msg.content);
         console.log(`worker ${cluster.worker.id} stop app ${msg.content.id}`);
         break;
     }
