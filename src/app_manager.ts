@@ -1,21 +1,20 @@
+import { runInThisContext } from "vm";
 import App from "./app";
 import InstallRequest from "./install";
 import Queues from "./queues";
 import Redis from "./redis";
-import { runInThisContext } from "vm";
-
 
 const api_obniz_io = `https://api.obniz.io`;
 const WebAppToken: string = process.env.TOKEN!;
 
 const dummyInstalls = [
   {
-      id: "ins1",
-      configs: {},
-      createdAt: "",
-      updatedAt: "",
-      user: {},
-      devicesInConfig: {}
+    id: "ins1",
+    configs: {},
+    createdAt: "",
+    updatedAt: "",
+    user: {},
+    devicesInConfig: {},
   },
   {
     id: "ins2",
@@ -23,7 +22,7 @@ const dummyInstalls = [
     createdAt: "",
     updatedAt: "",
     user: {},
-    devicesInConfig: {}
+    devicesInConfig: {},
   },
   {
     id: "ins3",
@@ -31,7 +30,7 @@ const dummyInstalls = [
     createdAt: "",
     updatedAt: "",
     user: {},
-    devicesInConfig: {}
+    devicesInConfig: {},
   },
   {
     id: "ins4",
@@ -39,7 +38,7 @@ const dummyInstalls = [
     createdAt: "",
     updatedAt: "",
     user: {},
-    devicesInConfig: {}
+    devicesInConfig: {},
   },
   {
     id: "ins5",
@@ -47,15 +46,14 @@ const dummyInstalls = [
     createdAt: "",
     updatedAt: "",
     user: {},
-    devicesInConfig: {}
+    devicesInConfig: {},
   },
-]
+];
 export default class AppManager {
   private installQueue = Queues.installQueue;
   private taskQueue = Queues.taskQueue;
 
-  constructor() {
-  }
+  constructor() {}
 
   public async start_master() {
     let installs: any[] = [];
@@ -75,19 +73,18 @@ export default class AppManager {
     console.log(`Install app number=${installs.length}`);
 
     for (const install of installs) {
-      this.installQueue.add('install', install);
+      this.installQueue.add("install", install);
     }
-
   }
 
   public async webhooked(obj: any) {
     const install = obj.data;
     if (obj.type === "install.create") {
-      this.installQueue.add('install', install);
+      this.installQueue.add("install", install);
     } else if (obj.type === "install.update") {
-      this.taskQueue.add('update', install);
+      this.taskQueue.add("update", install);
     } else if (obj.type === "install.delete") {
-      this.taskQueue.add('delete', install);
+      this.taskQueue.add("delete", install);
     }
   }
 }

@@ -8,9 +8,9 @@ const queues_1 = __importDefault(require("./queues"));
 const redis_1 = __importDefault(require("./redis"));
 const maxAppNum = Number(process.env.maxAppNum) || 2;
 const dynoId = process.env.DYNO;
-queues_1.default.installQueue.process('install', (job, done) => processInstall(job, done));
-queues_1.default.taskQueue.process('update', (job, done) => processUpdate(job, done));
-queues_1.default.taskQueue.process('delete', (job, done) => processDelete(job, done));
+queues_1.default.installQueue.process("install", (job, done) => processInstall(job, done));
+queues_1.default.taskQueue.process("update", (job, done) => processUpdate(job, done));
+queues_1.default.taskQueue.process("delete", (job, done) => processDelete(job, done));
 async function processInstall(job, done) {
     console.log(`worker:${dynoId} start ${JSON.stringify(job.data.id)}`);
     const app = new app_1.default(job.data);
@@ -18,7 +18,7 @@ async function processInstall(job, done) {
     await redis_1.default.redis.rpush(`worker:${dynoId}`, JSON.stringify({
         id: job.data.id,
         install: job.data,
-        app: app
+        app,
     }));
     await manageWorkers();
     // done();
@@ -29,12 +29,13 @@ async function processInstall(job, done) {
 }
 async function processUpdate(job, done) {
     const workerId = await getWorker(job.data);
-    if (workerId == undefined)
+    if (workerId === undefined) {
         done(new Error(`this worker does not have worker:${workerId}.`));
+    }
     const datas = await redis_1.default.redis.lrange(`worker:${workerId}`, 0, await redis_1.default.redis.llen(`worker:${workerId}`));
     for (const data of datas) {
         const data_obj = JSON.parse(data);
-        if (data_obj.id == job.data.id) {
+        if (data_obj.id === job.data.id) {
             await job.data.app.stop();
             await job.data.app.start();
         }
@@ -43,12 +44,13 @@ async function processUpdate(job, done) {
 }
 async function processDelete(job, done) {
     const workerId = await getWorker(job.data);
-    if (workerId == undefined)
+    if (workerId === undefined) {
         done(new Error(`this worker does not have worker:${workerId}.`));
+    }
     const datas = await redis_1.default.redis.lrange(`worker:${workerId}`, 0, await redis_1.default.redis.llen(`worker:${workerId}`));
     for (const data of datas) {
         const data_obj = JSON.parse(data);
-        if (data_obj.id == job.data.id) {
+        if (data_obj.id === job.data.id) {
             await job.data.app.stop();
             await redis_1.default.redis.lrem(`worker:${workerId}`, 0, JSON.stringify(job.data));
         }

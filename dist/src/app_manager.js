@@ -14,7 +14,7 @@ const dummyInstalls = [
         createdAt: "",
         updatedAt: "",
         user: {},
-        devicesInConfig: {}
+        devicesInConfig: {},
     },
     {
         id: "ins2",
@@ -22,7 +22,7 @@ const dummyInstalls = [
         createdAt: "",
         updatedAt: "",
         user: {},
-        devicesInConfig: {}
+        devicesInConfig: {},
     },
     {
         id: "ins3",
@@ -30,7 +30,7 @@ const dummyInstalls = [
         createdAt: "",
         updatedAt: "",
         user: {},
-        devicesInConfig: {}
+        devicesInConfig: {},
     },
     {
         id: "ins4",
@@ -38,7 +38,7 @@ const dummyInstalls = [
         createdAt: "",
         updatedAt: "",
         user: {},
-        devicesInConfig: {}
+        devicesInConfig: {},
     },
     {
         id: "ins5",
@@ -46,7 +46,7 @@ const dummyInstalls = [
         createdAt: "",
         updatedAt: "",
         user: {},
-        devicesInConfig: {}
+        devicesInConfig: {},
     },
 ];
 class AppManager {
@@ -71,19 +71,19 @@ class AppManager {
         installs = dummyInstalls;
         console.log(`Install app number=${installs.length}`);
         for (const install of installs) {
-            this.installQueue.add('install', install);
+            this.installQueue.add("install", install);
         }
     }
     async webhooked(obj) {
         const install = obj.data;
         if (obj.type === "install.create") {
-            this.installQueue.add('install', install);
+            this.installQueue.add("install", install);
         }
         else if (obj.type === "install.update") {
-            this.taskQueue.add('update', install);
+            this.taskQueue.add("update", install);
         }
         else if (obj.type === "install.delete") {
-            this.taskQueue.add('delete', install);
+            this.taskQueue.add("delete", install);
         }
     }
 }

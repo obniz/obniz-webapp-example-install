@@ -1,4 +1,4 @@
-import Obniz from "Obniz";
+import Obniz from "obniz";
 
 export default class App {
   public id: string;

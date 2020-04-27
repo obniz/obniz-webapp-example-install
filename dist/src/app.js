@@ -3,7 +3,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-const Obniz_1 = __importDefault(require("Obniz"));
+const obniz_1 = __importDefault(require("obniz"));
 class App {
     constructor(install) {
         this.state = "stopped";
@@ -28,7 +28,7 @@ class App {
             return;
         }
         console.log(`obniz ${obniz_id}`);
-        this.obniz = new Obniz_1.default(obniz_id);
+        this.obniz = new obniz_1.default(obniz_id);
         this.obniz.onconnect = async (obniz) => {
             console.log(`obniz ${this.obniz.id} connected`);
         };

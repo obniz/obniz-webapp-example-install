@@ -1,6 +1,6 @@
 import Queue from "bull";
 
 export default {
-  installQueue: new Queue('install'),
-  taskQueue: new Queue('task'),
-}
+  installQueue: new Queue("install"),
+  taskQueue: new Queue("task"),
+};

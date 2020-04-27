@@ -1,5 +1,5 @@
-import IORedis from 'ioredis';
+import IORedis from "ioredis";
 
 export default {
-    redis: new IORedis()
-}
+  redis: new IORedis(),
+};

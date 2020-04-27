@@ -1,9 +1,9 @@
 import bodyParser from "body-parser";
+import * as cluster from "cluster";
 import express from "express";
 import http from "http";
-import path from "path";
-import * as cluster from "cluster";
 import * as os from "os";
+import path from "path";
 
 import AppManager from "./app_manager";
 
