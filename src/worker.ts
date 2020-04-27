@@ -35,7 +35,7 @@ async function processInstall(job: any, done: any) {
 
 async function processUpdate(job: any, done: any) {
   const workerId = await getWorker(job.data);
-  if (workerId == undefined) 
+  if (workerId === undefined) 
     done(new Error(`this worker does not have worker:${workerId}.`));
   const datas = await Redis.redis.lrange(
     `worker:${workerId}`,
@@ -44,7 +44,7 @@ async function processUpdate(job: any, done: any) {
   );
   for (const data of datas) {
     const data_obj = JSON.parse(data);
-    if (data_obj.id == job.data.id) {
+    if (data_obj.id === job.data.id) {
       await job.data.app.stop();
       await job.data.app.start();
     }
@@ -54,7 +54,7 @@ async function processUpdate(job: any, done: any) {
 
 async function processDelete(job: any, done: any) {
   const workerId = await getWorker(job.data);
-  if (workerId == undefined) 
+  if (workerId === undefined) 
     done(new Error(`this worker does not have worker:${workerId}.`));
   const datas = await Redis.redis.lrange(
     `worker:${workerId}`,
@@ -63,7 +63,7 @@ async function processDelete(job: any, done: any) {
   );
   for (const data of datas) {
     const data_obj = JSON.parse(data);
-    if (data_obj.id == job.data.id) {
+    if (data_obj.id === job.data.id) {
       await job.data.app.stop();
       await Redis.redis.lrem(
         `worker:${workerId}`,
