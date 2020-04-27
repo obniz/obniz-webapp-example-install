@@ -7,61 +7,54 @@ import * as os from "os";
 
 import AppManager from "./app_manager";
 
-const cpuNum: number = os.cpus().length;
-
 const appManager = new AppManager();
 
-if (cluster.isMaster) {
-  // ============================
-  // Web Server
-  // ============================
+// ============================
+// Web Server
+// ============================
 
-  const expressApp = express();
+const expressApp = express();
 
-  const port = process.env.PORT || "8080";
-  expressApp.set("port", port);
-  expressApp.set("views", path.join(__dirname, "../", "views"));
-  expressApp.set("view engine", "ejs");
-  expressApp.use(bodyParser.json());
-  expressApp.use(bodyParser.urlencoded({ extended: false }));
+const port = process.env.PORT || "8080";
+expressApp.set("port", port);
+expressApp.set("views", path.join(__dirname, "../", "views"));
+expressApp.set("view engine", "ejs");
+expressApp.use(bodyParser.json());
+expressApp.use(bodyParser.urlencoded({ extended: false }));
 
-  // routing
+// routing
 
-  expressApp.get("/", async (req: any, res: any) => {
-    res.json({});
-  });
+expressApp.get("/", async (req: any, res: any) => {
+  res.json({});
+});
 
-  expressApp.post("/webhook", async (req: any, res: any) => {
-    console.log(req.body);
-    await appManager.webhooked(req.body);
+expressApp.post("/webhook", async (req: any, res: any) => {
+  console.log(req.body);
+  await appManager.webhooked(req.body);
 
-    res.json({});
-  });
+  res.json({});
+});
 
-  // Listen
+// Listen
 
-  const server = http.createServer(expressApp);
-  server.listen(port);
-  server.on("error", (e: any) => {
-    console.error(e);
-    process.exit(1);
-  });
-  server.on("listening", () => {
-    console.log("listening");
-  });
+const server = http.createServer(expressApp);
+server.listen(port);
+server.on("error", (e: any) => {
+  console.error(e);
+  process.exit(1);
+});
+server.on("listening", () => {
+  console.log("listening");
+});
 
-  // Start child processes
-  for (let i = 0; i < cpuNum; i++) {
-    cluster.fork();
-  }
-  // Allocate installs
-  appManager.start_master();
+// Allocate installs
+appManager.start_master();
 
-} else {
-  console.log(`hello, worker:${cluster.worker.id}`);
-  appManager.start_child();
+// } else {
+//   console.log(`hello, worker:${cluster.worker.id}`);
+//   appManager.start_child();
 
-}
+// }
 // ============================
 // Apps
 // ============================
