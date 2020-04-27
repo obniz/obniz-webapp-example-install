@@ -9,6 +9,8 @@ Queues.installQueue.process("install", (job, done) => processInstall(job, done))
 Queues.taskQueue.process("update", (job, done) => processUpdate(job, done));
 Queues.taskQueue.process("delete", (job, done) => processDelete(job, done));
 
+console.log(Redis.redis);
+
 async function processInstall(job: any, done: any) {
   console.log(`worker:${dynoId} start ${JSON.stringify(job.data.id)}`);
 

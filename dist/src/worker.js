@@ -11,6 +11,7 @@ const dynoId = process.env.DYNO;
 queues_1.default.installQueue.process("install", (job, done) => processInstall(job, done));
 queues_1.default.taskQueue.process("update", (job, done) => processUpdate(job, done));
 queues_1.default.taskQueue.process("delete", (job, done) => processDelete(job, done));
+console.log(redis_1.default.redis);
 async function processInstall(job, done) {
     console.log(`worker:${dynoId} start ${JSON.stringify(job.data.id)}`);
     const app = new app_1.default(job.data);
