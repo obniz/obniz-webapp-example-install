@@ -1,8 +1,6 @@
 import { runInThisContext } from "vm";
-import App from "./app";
 import InstallRequest from "./install";
 import Queues from "./queues";
-import Redis from "./redis";
 
 const api_obniz_io = `https://api.obniz.io`;
 const WebAppToken: string = process.env.TOKEN!;
