@@ -11,6 +11,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 const cluster = __importStar(require("cluster"));
+const bull_1 = __importDefault(require("bull"));
 const ioredis_1 = __importDefault(require("ioredis"));
 const app_1 = __importDefault(require("./app"));
 const install_1 = __importDefault(require("./install"));
@@ -33,14 +34,46 @@ const dummyInstalls = [
         user: {},
         devicesInConfig: {}
     },
+    {
+        id: "ins3",
+        configs: {},
+        createdAt: "",
+        updatedAt: "",
+        user: {},
+        devicesInConfig: {}
+    },
+    {
+        id: "ins4",
+        configs: {},
+        createdAt: "",
+        updatedAt: "",
+        user: {},
+        devicesInConfig: {}
+    },
+    {
+        id: "ins5",
+        configs: {},
+        createdAt: "",
+        updatedAt: "",
+        user: {},
+        devicesInConfig: {}
+    },
 ];
 class AppManager {
-    constructor(options) {
+    constructor() {
         this.apps = [];
-        this.redis = new ioredis_1.default(options);
+        this.installQueue = new bull_1.default('install');
+        this.taskQueue = new bull_1.default('task');
+        this.maxAppNum = Number(process.env.maxAppNum) || 2;
+        this.redis = new ioredis_1.default();
     }
-    async start() {
-        var _a;
+    start_child() {
+        this.installQueue.process('install', (job, done) => this.processInstall(job, done));
+        this.taskQueue.process('update', (job, done) => this.processUpdate(job, done));
+        this.taskQueue.process('delete', (job, done) => this.processDelete(job, done));
+        // this.taskQueue.process('delete', this.processDelete);
+    }
+    async start_master() {
         let installs = [];
         // Getting All Installs
         while (true) {
@@ -56,112 +89,85 @@ class AppManager {
         }
         installs = dummyInstalls;
         console.log(`Install app number=${installs.length}`);
-        // Initialize all workers status
-        const workerNum = Object.keys(cluster.workers).length;
-        for (let workerId = 1; workerId <= workerNum; workerId++) {
-            if (await this.redis.exists("worker:" + workerId)) {
-                let havingInstalls = await this.redis.lrange("worker:" + workerId, 0, await this.redis.llen("worker:" + workerId));
-                havingInstalls = JSON.parse("[" + String(havingInstalls) + "]");
-                const havingInstallsId = havingInstalls.map((install) => install.id);
-                // Start already allocated installs
-                for (const installId of havingInstallsId) {
-                    const allInstallsId = installs.map((install) => install.id);
-                    if (allInstallsId.indexOf(installId) >= 0) {
-                        (_a = cluster.workers[workerId]) === null || _a === void 0 ? void 0 : _a.send({
-                            type: "start",
-                            content: havingInstalls.filter((install) => install.id == installId)[0]
-                        });
-                    }
-                    else {
-                        await this.redis.lrem("worker:" + workerId, 1, JSON.stringify(havingInstalls.filter((install) => install.id == installId)[0]));
-                    }
-                }
-                // Delete started installs from all installs
-                installs = installs.filter((install) => havingInstallsId.indexOf(install.id) < 0);
-            }
-        }
         for (const install of installs) {
-            await this.allocateInstall(install);
+            this.installQueue.add('install', install);
         }
     }
-    async getLazyWorkerId() {
-        let lazyWorkerId = 0;
-        let minInstallNum = 1000;
-        const workerNum = Object.keys(cluster.workers).length;
-        for (let workerId = 1; workerId <= workerNum; workerId++) {
-            let havingInstallNum = await this.redis.llen("worker:" + workerId);
-            console.log(`worker:${workerId} has ${havingInstallNum} installs`);
-            if (havingInstallNum < minInstallNum) {
-                minInstallNum = havingInstallNum;
-                lazyWorkerId = workerId;
+    async processInstall(job, done) {
+        console.log(`worker:${cluster.worker.id} start ${JSON.stringify(job.data.id)}`);
+        const app = new app_1.default(job.data);
+        app.start();
+        await this.redis.rpush(`worker:${cluster.worker.id}`, JSON.stringify({
+            id: job.data.id,
+            install: job.data,
+            app: app
+        }));
+        await this.manageWorkers();
+        done();
+        // looping(app).then(() => {
+        //   // finished looping
+        //   done();
+        // });
+    }
+    async processUpdate(job, done) {
+        const workerId = await this.getWorker(job.data);
+        const datas = await this.redis.lrange(`worker:${workerId}`, 0, await this.redis.llen(`worker:${workerId}`));
+        for (const data of datas) {
+            const data_obj = JSON.parse(data);
+            if (data_obj.id == job.data.id) {
+                await job.data.app.stop();
+                await job.data.app.start();
             }
         }
-        return lazyWorkerId;
+        done();
     }
-    async allocateInstall(install) {
-        var _a;
-        // Allocate install to worker with minimal installs
-        let workerId = await this.getLazyWorkerId();
-        (_a = cluster.workers[workerId]) === null || _a === void 0 ? void 0 : _a.send({
-            type: "start",
-            content: install
-        });
+    async processDelete(job, done) {
+        const workerId = await this.getWorker(job.data);
+        const datas = await this.redis.lrange(`worker:${workerId}`, 0, await this.redis.llen(`worker:${workerId}`));
+        for (const data of datas) {
+            const data_obj = JSON.parse(data);
+            if (data_obj.id == job.data.id) {
+                await job.data.app.stop();
+                await this.redis.lrem(`worker:${workerId}`, 0, JSON.stringify(job.data));
+            }
+        }
+        await this.manageWorkers();
+        done();
     }
-    async deleteInstall(install) {
-        var _a;
-        let workerId = await this.getWorker(install.id);
-        (_a = cluster.workers[workerId]) === null || _a === void 0 ? void 0 : _a.send({
-            type: "stop",
-            content: install
-        });
+    async manageWorkers() {
+        // 状態を監視して，多すぎたら止める
+        const appNum = await this.redis.llen(`worker:${cluster.worker.id}`);
+        if (appNum >= this.maxAppNum) {
+            await this.installQueue.pause(true);
+        }
+        else if (appNum < this.maxAppNum) {
+            await this.installQueue.resume(true);
+        }
     }
     async webhooked(obj) {
         const install = obj.data;
         if (obj.type === "install.create") {
-            await this.allocateInstall(install);
+            this.installQueue.add('install', install);
         }
         else if (obj.type === "install.update") {
-            await this.deleteInstall(install);
-            // TODO: stopするのを待つ必要がある気がする
-            // TODO: 同じworkerの方がいい？
-            await this.allocateInstall(install);
+            this.taskQueue.add('update', install);
         }
         else if (obj.type === "install.delete") {
-            await this.deleteInstall(install);
+            this.taskQueue.add('delete', install);
         }
     }
     async getWorker(installId) {
-        const workerNum = Object.keys(cluster.workers).length;
-        for (let workerId = 1; workerId <= workerNum; workerId++) {
+        for (const workerId of Object.keys(cluster.workers)) {
             if (await this.redis.exists("worker:" + workerId)) {
                 const havingInstalls = await this.redis.lrange("worker:" + workerId, 0, await this.redis.llen("worker:" + workerId));
-                const havingInstallsId = havingInstalls.map((install) => install.id);
+                const havingInstallsId = havingInstalls.map((data) => data.id);
                 if (havingInstallsId.indexOf(installId) >= 0) {
                     return workerId;
                 }
             }
         }
+        // TODO: エラー処理
         return null;
-    }
-    async startApp(install) {
-        const app = new app_1.default(install);
-        this.apps.push(app);
-        await app.start();
-        await this.redis.rpush("worker:" + cluster.worker.id, JSON.stringify(install));
-        looping(app).then(() => {
-            // finished looping
-        });
-    }
-    async stopApp(install) {
-        for (const app of this.apps) {
-            if (app.id === install.id) {
-                this.apps.splice(this.apps.indexOf(app), 1);
-                await app.stop();
-                await this.redis.lrem("worker:" + cluster.worker.id, 1, JSON.stringify(install));
-                return;
-            }
-        }
-        console.log(`not found install ${install.id}`);
     }
 }
 exports.default = AppManager;

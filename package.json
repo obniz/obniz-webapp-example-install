@@ -36,6 +36,8 @@
     "typescript": "^3.6.3"
   },
   "dependencies": {
+    "@types/bull": "^3.12.2",
+    "bull": "^3.13.0",
     "ejs": "^3.0.2",
     "express": "^4.17.1",
     "graphql-request": "^1.8.2",

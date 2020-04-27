@@ -55,24 +55,11 @@ if (cluster.isMaster) {
     cluster.fork();
   }
   // Allocate installs
-  appManager.start();
+  appManager.start_master();
 
 } else {
-  
-  process.on("message", (msg: any) => {
-    switch(msg.type) {
-      
-      case "start": 
-        // await appManager.startApp(msg.content);
-        console.log(`worker ${cluster.worker.id} start app ${msg.content.id}`);
-        break;
-      
-      case "stop":
-        // await appManager.stopApp(msg.content);
-        console.log(`worker ${cluster.worker.id} stop app ${msg.content.id}`);
-        break;
-    }
-  });
+  console.log(`hello, worker:${cluster.worker.id}`);
+  appManager.start_child();
 
 }
 // ============================
