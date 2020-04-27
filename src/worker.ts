@@ -83,6 +83,7 @@ async function manageWorkers() {
   const appNum = await Redis.redis.llen(`worker:${dynoId}`);
   if (appNum >= maxAppNum) {
     await Queues.installQueue.pause(true);
+    console.log(`[WARNING] worker:${dynoId} is busy.`);
   } else if (appNum < maxAppNum) {
     await Queues.installQueue.resume(true);
   }

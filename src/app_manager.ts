@@ -51,10 +51,8 @@ const dummyInstalls = [
   },
 ]
 export default class AppManager {
-  private redis = Redis.redis;
   private installQueue = Queues.installQueue;
   private taskQueue = Queues.taskQueue;
-  private maxAppNum: number = Number(process.env.maxAppNum) || 2;
 
   constructor() {
   }

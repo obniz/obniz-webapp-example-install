@@ -5,7 +5,6 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 Object.defineProperty(exports, "__esModule", { value: true });
 const install_1 = __importDefault(require("./install"));
 const queues_1 = __importDefault(require("./queues"));
-const redis_1 = __importDefault(require("./redis"));
 const api_obniz_io = `https://api.obniz.io`;
 const WebAppToken = process.env.TOKEN;
 const dummyInstalls = [
@@ -52,10 +51,8 @@ const dummyInstalls = [
 ];
 class AppManager {
     constructor() {
-        this.redis = redis_1.default.redis;
         this.installQueue = queues_1.default.installQueue;
         this.taskQueue = queues_1.default.taskQueue;
-        this.maxAppNum = Number(process.env.maxAppNum) || 2;
     }
     async start_master() {
         let installs = [];

@@ -1,28 +1,21 @@
 "use strict";
-var __importStar = (this && this.__importStar) || function (mod) {
-    if (mod && mod.__esModule) return mod;
-    var result = {};
-    if (mod != null) for (var k in mod) if (Object.hasOwnProperty.call(mod, k)) result[k] = mod[k];
-    result["default"] = mod;
-    return result;
-};
 var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-const cluster = __importStar(require("cluster"));
 const app_1 = __importDefault(require("./app"));
 const queues_1 = __importDefault(require("./queues"));
 const redis_1 = __importDefault(require("./redis"));
 const maxAppNum = Number(process.env.maxAppNum) || 2;
+const dynoId = process.env.DYNO;
 queues_1.default.installQueue.process('install', (job, done) => processInstall(job, done));
 queues_1.default.taskQueue.process('update', (job, done) => processUpdate(job, done));
 queues_1.default.taskQueue.process('delete', (job, done) => processDelete(job, done));
 async function processInstall(job, done) {
-    console.log(`worker:${cluster.worker.id} start ${JSON.stringify(job.data.id)}`);
+    console.log(`worker:${dynoId} start ${JSON.stringify(job.data.id)}`);
     const app = new app_1.default(job.data);
     app.start();
-    await redis_1.default.redis.rpush(`worker:${cluster.worker.id}`, JSON.stringify({
+    await redis_1.default.redis.rpush(`worker:${dynoId}`, JSON.stringify({
         id: job.data.id,
         install: job.data,
         app: app
@@ -36,6 +29,8 @@ async function processInstall(job, done) {
 }
 async function processUpdate(job, done) {
     const workerId = await getWorker(job.data);
+    if (workerId == undefined)
+        done(new Error(`this worker does not have worker:${workerId}.`));
     const datas = await redis_1.default.redis.lrange(`worker:${workerId}`, 0, await redis_1.default.redis.llen(`worker:${workerId}`));
     for (const data of datas) {
         const data_obj = JSON.parse(data);
@@ -48,6 +43,8 @@ async function processUpdate(job, done) {
 }
 async function processDelete(job, done) {
     const workerId = await getWorker(job.data);
+    if (workerId == undefined)
+        done(new Error(`this worker does not have worker:${workerId}.`));
     const datas = await redis_1.default.redis.lrange(`worker:${workerId}`, 0, await redis_1.default.redis.llen(`worker:${workerId}`));
     for (const data of datas) {
         const data_obj = JSON.parse(data);
@@ -61,26 +58,25 @@ async function processDelete(job, done) {
 }
 async function manageWorkers() {
     // 状態を監視して，多すぎたら止める
-    const appNum = await redis_1.default.redis.llen(`worker:${cluster.worker.id}`);
+    const appNum = await redis_1.default.redis.llen(`worker:${dynoId}`);
     if (appNum >= maxAppNum) {
         await queues_1.default.installQueue.pause(true);
+        console.log(`[WARNING] worker:${dynoId} is busy.`);
     }
     else if (appNum < maxAppNum) {
         await queues_1.default.installQueue.resume(true);
     }
 }
 async function getWorker(installId) {
-    for (const workerId of Object.keys(cluster.workers)) {
-        if (await redis_1.default.redis.exists("worker:" + workerId)) {
-            const havingInstalls = await redis_1.default.redis.lrange("worker:" + workerId, 0, await redis_1.default.redis.llen("worker:" + workerId));
-            const havingInstallsId = havingInstalls.map((data) => data.id);
-            if (havingInstallsId.indexOf(installId) >= 0) {
-                return workerId;
-            }
+    if (await redis_1.default.redis.exists("worker:" + dynoId)) {
+        const havingInstalls = await redis_1.default.redis.lrange("worker:" + dynoId, 0, await redis_1.default.redis.llen("worker:" + dynoId));
+        const havingInstallsId = havingInstalls.map((data) => data.id);
+        if (havingInstallsId.indexOf(installId) >= 0) {
+            return dynoId;
         }
     }
     // TODO: エラー処理
-    return null;
+    return undefined;
 }
 async function looping(app) {
     while (app.state === "starting" || app.state === "started") {
