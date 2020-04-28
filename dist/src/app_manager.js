@@ -77,13 +77,13 @@ class AppManager {
     async webhooked(obj) {
         const install = obj.data;
         if (obj.type === "install.create") {
-            this.installQueue.add("install", install);
+            this.installQueue.add("install", install, { attempts: 10 });
         }
         else if (obj.type === "install.update") {
-            this.taskQueue.add("update", install);
+            this.taskQueue.add("update", install, { attempts: 10 });
         }
         else if (obj.type === "install.delete") {
-            this.taskQueue.add("delete", install);
+            this.taskQueue.add("delete", install, { attempts: 10 });
         }
     }
 }
