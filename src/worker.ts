@@ -25,11 +25,11 @@ async function processInstall(job: any, done: any) {
   );
   await manageWorkers();
 
-  // done();
-  looping(app).then(() => {
-    // finished looping
-    done();
-  });
+  done();
+  // looping(app).then(() => {
+  //   // finished looping
+  //   done();
+  // });
 }
 
 async function processUpdate(job: any, done: any) {
@@ -101,7 +101,7 @@ async function looping(app: App) {
     } catch (e) {
       console.error(e);
     }
-    return new Promise((resolve) => {
+    await new Promise((resolve) => {
       setTimeout(resolve, 1000);
     });
   }
