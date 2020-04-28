@@ -14,7 +14,7 @@ queues_1.default.taskQueue.process("delete", (job, done) => processDelete(job, d
 async function processInstall(job, done) {
     console.log(`worker:${dynoId} start ${JSON.stringify(job.data.id)}`);
     const app = new app_1.default(job.data);
-    app.start();
+    // app.start();
     await redis_1.default.status.rpush(`worker:${dynoId}`, JSON.stringify({
         id: job.data.id,
         install: job.data,

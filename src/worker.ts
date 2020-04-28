@@ -13,7 +13,7 @@ async function processInstall(job: any, done: any) {
   console.log(`worker:${dynoId} start ${JSON.stringify(job.data.id)}`);
 
   const app = new App(job.data);
-  app.start();
+  // app.start();
 
   await Redis.status.rpush(
     `worker:${dynoId}`,
