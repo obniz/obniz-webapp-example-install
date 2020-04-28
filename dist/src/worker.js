@@ -11,12 +11,11 @@ const dynoId = process.env.DYNO;
 queues_1.default.installQueue.process("install", (job, done) => processInstall(job, done));
 queues_1.default.taskQueue.process("update", (job, done) => processUpdate(job, done));
 queues_1.default.taskQueue.process("delete", (job, done) => processDelete(job, done));
-console.log(redis_1.default.redis);
 async function processInstall(job, done) {
     console.log(`worker:${dynoId} start ${JSON.stringify(job.data.id)}`);
     const app = new app_1.default(job.data);
     app.start();
-    await redis_1.default.redis.rpush(`worker:${dynoId}`, JSON.stringify({
+    await redis_1.default.status.rpush(`worker:${dynoId}`, JSON.stringify({
         id: job.data.id,
         install: job.data,
         app,
@@ -33,7 +32,7 @@ async function processUpdate(job, done) {
     if (workerId === undefined) {
         done(new Error(`this worker does not have worker:${workerId}.`));
     }
-    const datas = await redis_1.default.redis.lrange(`worker:${workerId}`, 0, await redis_1.default.redis.llen(`worker:${workerId}`));
+    const datas = await redis_1.default.status.lrange(`worker:${workerId}`, 0, await redis_1.default.status.llen(`worker:${workerId}`));
     for (const data of datas) {
         const data_obj = JSON.parse(data);
         if (data_obj.id === job.data.id) {
@@ -48,12 +47,12 @@ async function processDelete(job, done) {
     if (workerId === undefined) {
         done(new Error(`this worker does not have worker:${workerId}.`));
     }
-    const datas = await redis_1.default.redis.lrange(`worker:${workerId}`, 0, await redis_1.default.redis.llen(`worker:${workerId}`));
+    const datas = await redis_1.default.status.lrange(`worker:${workerId}`, 0, await redis_1.default.status.llen(`worker:${workerId}`));
     for (const data of datas) {
         const data_obj = JSON.parse(data);
         if (data_obj.id === job.data.id) {
             await job.data.app.stop();
-            await redis_1.default.redis.lrem(`worker:${workerId}`, 0, JSON.stringify(job.data));
+            await redis_1.default.status.lrem(`worker:${workerId}`, 0, JSON.stringify(job.data));
         }
     }
     await manageWorkers();
@@ -61,7 +60,7 @@ async function processDelete(job, done) {
 }
 async function manageWorkers() {
     // 状態を監視して，多すぎたら止める
-    const appNum = await redis_1.default.redis.llen(`worker:${dynoId}`);
+    const appNum = await redis_1.default.status.llen(`worker:${dynoId}`);
     if (appNum >= maxAppNum) {
         await queues_1.default.installQueue.pause(true);
         console.log(`[WARNING] worker:${dynoId} is busy.`);
@@ -71,8 +70,8 @@ async function manageWorkers() {
     }
 }
 async function getWorker(installId) {
-    if (await redis_1.default.redis.exists("worker:" + dynoId)) {
-        const havingInstalls = await redis_1.default.redis.lrange("worker:" + dynoId, 0, await redis_1.default.redis.llen("worker:" + dynoId));
+    if (await redis_1.default.status.exists("worker:" + dynoId)) {
+        const havingInstalls = await redis_1.default.status.lrange("worker:" + dynoId, 0, await redis_1.default.status.llen("worker:" + dynoId));
         const havingInstallsId = havingInstalls.map((data) => data.id);
         if (havingInstallsId.indexOf(installId) >= 0) {
             return dynoId;
@@ -89,7 +88,7 @@ async function looping(app) {
         catch (e) {
             console.error(e);
         }
-        await new Promise((resolve) => {
+        return new Promise((resolve) => {
             setTimeout(resolve, 1000);
         });
     }
