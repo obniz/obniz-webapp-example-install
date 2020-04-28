@@ -9,10 +9,25 @@ const redis_1 = __importDefault(require("./redis"));
 const maxAppNum = Number(process.env.maxAppNum) || 2;
 const dynoId = process.env.DYNO || "local";
 const sleep = (msec) => new Promise((resolve) => setTimeout(resolve, msec));
+// Start worker
+startHavingApps();
 queues_1.default.installQueue.process("install", (job, done) => processInstall(job, done));
 queues_1.default.taskQueue.process("update", (job, done) => processUpdate(job, done));
 queues_1.default.taskQueue.process("delete", (job, done) => processDelete(job, done));
+async function startHavingApps() {
+    const havingAppsString = await redis_1.default.status.lrange(`worker:${dynoId}`, 0, await redis_1.default.status.llen(`worker:${dynoId}`));
+    const havingApps = havingAppsString.map((data) => JSON.parse(data).app);
+    for (const app of havingApps) {
+        debugprint(`start ${app.id}`);
+        // app.start();
+    }
+}
 async function processInstall(job, done) {
+    const maxFlag = await manageWorkers();
+    if (maxFlag) {
+        done(new Error(`cannnot have more apps`));
+        return;
+    }
     debugprint(`start ${JSON.stringify(job.data.id)}`);
     const app = new app_1.default(job.data);
     // app.start();
@@ -40,11 +55,11 @@ async function processUpdate(job, done) {
     for (const data of datas) {
         const data_obj = JSON.parse(data);
         if (data_obj.id === job.data.id) {
-            await job.data.app.stop();
-            await job.data.app.start();
+            // await job.data.app.stop();
+            // await job.data.app.start();
+            debugprint(`updated ${job.data.id}`);
         }
     }
-    debugprint(`updated ${job.data.id}`);
     done();
 }
 async function processDelete(job, done) {
@@ -75,13 +90,15 @@ async function manageWorkers() {
     if (appNum >= maxAppNum) {
         debugprint(`stop subscribe(has ${appNum} apps)`);
         queues_1.default.installQueue.pause(true);
+        return true;
     }
-    else if (appNum < maxAppNum) {
+    else {
         queues_1.default.installQueue.resume(true);
+        return false;
     }
 }
 async function checkWorkerHas(install) {
-    const havingInstalls = await redis_1.default.status.lrange("worker:" + dynoId, 0, await redis_1.default.status.llen("worker:" + dynoId));
+    const havingInstalls = await redis_1.default.status.lrange(`worker:${dynoId}`, 0, await redis_1.default.status.llen(`worker:${dynoId}`));
     const havingInstallsId = havingInstalls.map((data) => JSON.parse(data).id);
     debugprint(`have ${havingInstallsId}`);
     if (havingInstallsId.indexOf(install.id) >= 0) {
