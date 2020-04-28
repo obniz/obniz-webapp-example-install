@@ -33,6 +33,7 @@ async function processInstall(job: any, done: any) {
 }
 
 async function processUpdate(job: any, done: any) {
+  console.log(`${dynoId} process this queue.`);
   const workerId = await getWorker(job.data);
   if (workerId === undefined) {
     done(new Error(`this worker does not have worker:${workerId}.`));
@@ -45,10 +46,12 @@ async function processUpdate(job: any, done: any) {
       await job.data.app.start();
     }
   }
+  console.log(`${dynoId} updated ${workerId}`);
   done();
 }
 
 async function processDelete(job: any, done: any) {
+  console.log(`${dynoId} process this queue.`);
   const workerId = await getWorker(job.data);
   if (workerId === undefined) {
     done(new Error(`this worker does not have worker:${workerId}.`));
@@ -63,7 +66,7 @@ async function processDelete(job: any, done: any) {
   }
 
   await manageWorkers();
-
+  console.log(`${dynoId} deleted ${workerId}`);
   done();
 }
 
