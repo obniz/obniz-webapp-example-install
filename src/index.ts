@@ -27,7 +27,6 @@ expressApp.get("/", async (req: any, res: any) => {
 });
 
 expressApp.post("/webhook", async (req: any, res: any) => {
-  console.log(req.body);
   await appManager.webhooked(req.body);
 
   res.json({});
@@ -42,25 +41,7 @@ server.on("error", (e: any) => {
   process.exit(1);
 });
 server.on("listening", () => {
-  console.log("listening");
 });
 
-// Allocate installs
+// Start master process
 appManager.start_master();
-
-// } else {
-//   console.log(`hello, worker:${cluster.worker.id}`);
-//   appManager.start_child();
-
-// }
-// ============================
-// Apps
-// ============================
-
-// const appManager = new AppManager();
-// appManager
-//   .start()
-//   .then(() => {})
-//   .catch((e: Error) => {
-//     throw e;
-//   });

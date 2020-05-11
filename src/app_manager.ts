@@ -16,7 +16,6 @@ export default class AppManager {
     // Getting All Installs
     while (true) {
       const result = await InstallRequest(api_obniz_io, WebAppToken, installs.length);
-      console.log(result);
       for (const edge of result.webapp.installs.edges) {
         const node = edge.node;
         installs.push(node);
@@ -25,7 +24,6 @@ export default class AppManager {
         break;
       }
     }
-    console.log(`Install app number=${installs.length}`);
 
     for (const install of installs) {
       this.installQueue.add("install", install);
