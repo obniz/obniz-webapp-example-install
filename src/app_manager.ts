@@ -5,48 +5,6 @@ import Queues from "./queues";
 const api_obniz_io = `https://api.obniz.io`;
 const WebAppToken: string = process.env.TOKEN!;
 
-const dummyInstalls = [
-  {
-    id: "ins1",
-    configs: {},
-    createdAt: "",
-    updatedAt: "",
-    user: {},
-    devicesInConfig: {},
-  },
-  {
-    id: "ins2",
-    configs: {},
-    createdAt: "",
-    updatedAt: "",
-    user: {},
-    devicesInConfig: {},
-  },
-  {
-    id: "ins3",
-    configs: {},
-    createdAt: "",
-    updatedAt: "",
-    user: {},
-    devicesInConfig: {},
-  },
-  {
-    id: "ins4",
-    configs: {},
-    createdAt: "",
-    updatedAt: "",
-    user: {},
-    devicesInConfig: {},
-  },
-  {
-    id: "ins5",
-    configs: {},
-    createdAt: "",
-    updatedAt: "",
-    user: {},
-    devicesInConfig: {},
-  },
-];
 export default class AppManager {
   private installQueue = Queues.installQueue;
   private taskQueue = Queues.taskQueue;
@@ -67,7 +25,6 @@ export default class AppManager {
         break;
       }
     }
-    installs = dummyInstalls;
     console.log(`Install app number=${installs.length}`);
 
     for (const install of installs) {
