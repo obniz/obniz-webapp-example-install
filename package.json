@@ -42,7 +42,8 @@
     "express": "^4.17.1",
     "graphql-request": "^1.8.2",
     "ioredis": "^4.16.2",
-    "obniz": "^3.4.1"
+    "obniz": "^3.4.1",
+    "obniz-cloud-sdk": "git+https://github.com/obniz/obniz-cloud-sdk.git"
   },
   "heroku-run-build-script": false
 }

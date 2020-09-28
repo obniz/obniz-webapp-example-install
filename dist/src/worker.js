@@ -9,7 +9,7 @@ const redis_1 = __importDefault(require("./redis"));
 const maxAppNum = Number(process.env.maxAppNum) || 2;
 const dynoId = process.env.DYNO || "local";
 const sleep = (msec) => new Promise((resolve) => setTimeout(resolve, msec));
-// Start worker
+// Start worker process
 startHavingApps();
 queues_1.default.installQueue.process("install", (job, done) => processInstall(job, done));
 queues_1.default.taskQueue.process("update", (job, done) => processUpdate(job, done));
@@ -18,7 +18,6 @@ async function startHavingApps() {
     const havingAppsString = await redis_1.default.status.lrange(`worker:${dynoId}`, 0, await redis_1.default.status.llen(`worker:${dynoId}`));
     const havingApps = havingAppsString.map((data) => JSON.parse(data).app);
     for (const app of havingApps) {
-        debugprint(`start ${app.id}`);
         // app.start();
     }
 }
@@ -28,7 +27,6 @@ async function processInstall(job, done) {
         done(new Error(`cannnot have more apps`));
         return;
     }
-    debugprint(`start ${JSON.stringify(job.data.id)}`);
     const app = new app_1.default(job.data);
     // app.start();
     await redis_1.default.status.rpush(`worker:${dynoId}`, JSON.stringify({
@@ -44,10 +42,8 @@ async function processInstall(job, done) {
     // });
 }
 async function processUpdate(job, done) {
-    debugprint("process update task");
     const installFlag = await checkWorkerHas(job.data);
     if (!installFlag) {
-        debugprint(`not have ${job.data.id}`);
         done(new Error(`this job is not have ${job.data.id}.`));
         return;
     }
@@ -57,16 +53,13 @@ async function processUpdate(job, done) {
         if (data_obj.id === job.data.id) {
             // await job.data.app.stop();
             // await job.data.app.start();
-            debugprint(`updated ${job.data.id}`);
         }
     }
     done();
 }
 async function processDelete(job, done) {
-    debugprint("process delete task");
     const installFlag = await checkWorkerHas(job.data);
     if (!installFlag) {
-        debugprint(`not have ${job.data.id}`);
         done(new Error(`this worker does not have ${job.data.id}.`));
         return;
     }
@@ -79,7 +72,6 @@ async function processDelete(job, done) {
             await redis_1.default.status.lrem(`worker:${dynoId}`, 0, "deleted");
         }
     });
-    debugprint(`deleted ${job.data.id}`);
     await sleep(500);
     await manageWorkers();
     done();
@@ -88,7 +80,6 @@ async function manageWorkers() {
     // 状態を監視して，多すぎたら止める
     const appNum = await redis_1.default.status.llen(`worker:${dynoId}`);
     if (appNum >= maxAppNum) {
-        debugprint(`stop subscribe(has ${appNum} apps)`);
         queues_1.default.installQueue.pause(true);
         return true;
     }
@@ -100,7 +91,6 @@ async function manageWorkers() {
 async function checkWorkerHas(install) {
     const havingInstalls = await redis_1.default.status.lrange(`worker:${dynoId}`, 0, await redis_1.default.status.llen(`worker:${dynoId}`));
     const havingInstallsId = havingInstalls.map((data) => JSON.parse(data).id);
-    debugprint(`have ${havingInstallsId}`);
     if (havingInstallsId.indexOf(install.id) >= 0) {
         return true;
     }
@@ -119,7 +109,4 @@ async function looping(app) {
             setTimeout(resolve, 1000);
         });
     }
-}
-function debugprint(content) {
-    console.log(`[worker:${dynoId}] ${content}`);
 }

@@ -40,8 +40,7 @@ server.on("error", (e: any) => {
   console.error(e);
   process.exit(1);
 });
-server.on("listening", () => {
-});
+server.on("listening", () => {});
 
 // Start master process
 appManager.start_master();
