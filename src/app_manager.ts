@@ -1,3 +1,6 @@
+import { GraphQLClient } from "graphql-request";
+import { getSdk } from "obniz-cloud-sdk";
+
 import App from "./app";
 import InstallRequest from "./install";
 
@@ -12,10 +15,28 @@ export default class AppManager {
 
   public async start() {
     // Getting All Installs
+    const client = new GraphQLClient(`${api_obniz_io}/v1/graphql`, {
+      headers: {
+        authorization: `Bearer ${WebAppToken}`,
+      },
+    });
+    const cloudSdk = getSdk(client);
     while (true) {
-      const result = await InstallRequest(api_obniz_io, WebAppToken, this.installs.length);
+      const result = await cloudSdk.webapp({ first: 10, skip: this.installs.length });
+      if (result === null || result === undefined) {
+        break;
+      }
+      if (result.webapp === null || result.webapp === undefined) {
+        break;
+      }
+      if (result.webapp.installs === null || result.webapp.installs === undefined) {
+        break;
+      }
       console.log(result);
       for (const edge of result.webapp.installs.edges) {
+        if (edge === null) {
+          continue;
+        }
         const node = edge.node;
         this.installs.push(node);
       }

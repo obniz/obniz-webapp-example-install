@@ -3,8 +3,9 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
+const graphql_request_1 = require("graphql-request");
+const obniz_cloud_sdk_1 = require("obniz-cloud-sdk");
 const app_1 = __importDefault(require("./app"));
-const install_1 = __importDefault(require("./install"));
 const api_obniz_io = `https://api.obniz.io`;
 const WebAppToken = process.env.TOKEN;
 class AppManager {
@@ -14,10 +15,28 @@ class AppManager {
     }
     async start() {
         // Getting All Installs
+        const client = new graphql_request_1.GraphQLClient(`${api_obniz_io}/v1/graphql`, {
+            headers: {
+                authorization: `Bearer ${WebAppToken}`,
+            },
+        });
+        const cloudSdk = obniz_cloud_sdk_1.getSdk(client);
         while (true) {
-            const result = await install_1.default(api_obniz_io, WebAppToken, this.installs.length);
+            const result = await cloudSdk.webapp({ first: 10, skip: this.installs.length });
+            if (result === null || result === undefined) {
+                break;
+            }
+            if (result.webapp === null || result.webapp === undefined) {
+                break;
+            }
+            if (result.webapp.installs === null || result.webapp.installs === undefined) {
+                break;
+            }
             console.log(result);
             for (const edge of result.webapp.installs.edges) {
+                if (edge === null) {
+                    continue;
+                }
                 const node = edge.node;
                 this.installs.push(node);
             }
